@@ -1,58 +1,63 @@
 (ns luminus.config
-  (use [clojure.walk :only [prewalk]]))
+  (require [clojure.zip :as z]))
 
-(def dependency-tree {:+site {:+clabango ^:d {:+auth-simple ^:d {}
-                                                    :+dailycred {:+dailycred-simple ^:d {}
-                                                                 :+oauth {}}}
-                              :+hiccup {:+auth-simple ^:d {}
-                                        :+dailycred {:+dailycred-simple ^:d {}
-                                                     :+oauth {}}}}})
+(def dependencies [:+site [:+clabango [:+auth-db 
+                                       :+dailycred]
+                           :+hiccup [:+auth-db 
+                                     :+dailycred]]])
 
-; tbd: use expanded-features
-(defn feature-precedence [feature expanded-features]
-  (loop [deps dependency-tree
-         level 0]
-    (println (keys deps))
-    (if (empty? deps)
-      0
-      (if (some (partial = feature) (keys deps)) 
-        level
-        (recur (apply merge (vals deps))
-               (dec level))))))
+(defn children-deps [feat deps] 
+  (when-let [n (first (keep-indexed #(if (= feat %2) %1) deps))]
+    (let [children (get deps (inc n))]
+      (when (vector? children)
+        children))))
 
-;fixme
-(defn some-expandable-feature [features]
-  (some (fn [feature] 
-          (and (not (contains? result feature)) 
-               (when-let [dependencies (get dependency-tree feature)]
-                 [feature dependencies])) )
-        features))
+(defn default-dep [feat deps]
+    (first (children-deps feat deps)))
 
-
-(some-expandable-feature [:site])
-
-;tbd ask is there any expandable ? if yes, then expand, otherwise we are done
-(defn expand 
-  "'features' is a set features, features are represented using keywords."
-  [features]
-  (loop [result (set features)]
-    (if-let [[feature dependencies] (some-expandable-feature features result)]
-      result
-      "false")))
-
-(defmulti add-feature (fn [feature previous-features] 
-                        [feature previous-features]))
+(defn expanded? [feat feats deps]
+  (let [children (filter (comp not vector?) (children-deps feat deps))]
+    (or (empty? children)
+        (some (set children) feats))))
   
-(defmethod add-feature [:+clabango []] [_ []]
-  [["+clabango"]])
+(defn spy [msg v]
+  (println (format "%s: %s" msg v))
+  v)
+  
+(defn expand [features]
+  (loop [feats (seq features)
+         deps dependencies
+         result []]
+    (if (empty? feats)
+      result
+      (let [feat (first feats)
+            new-feats (into (when-not (expanded? feat feats deps) (vector (default-dep feat deps))) 
+                            (rest feats))
+            new-deps (into deps (children-deps feat deps))
+            new-result (conj result feat)]
+        (recur new-feats
+               new-deps
+               new-result)))))
 
-(defmethod add-feature [:+clabango [:+site]] [_ _]
-  (reduce into [(add-feature :+clabango []) 
-                ["+site"]]))
+(expand [:+site :+dailycred])
 
-(defmethod add-feature [:+hiccup []] [_ []]
-  ["+hiccup"])
+{k (if (vector? v) (apply to-map v) v)}
 
-(defmethod add-feature [:+hiccup [:+site]] [_ _]
-  (reduce into [(add-feature :+hiccup []) 
-                ["+site"]]))
+(defn to-map
+  ([k v] 
+   (if (vector? v)
+     {k (apply to-map v)}
+     {k nil, v nil}))
+  ([k v & more] 
+   (merge (to-map k v)
+          (apply to-map more))))
+
+(apply to-map dependencies)
+
+(defn augment [features]
+  (defn path [feat]
+    (let [dz (z/zipper map? (comp merge keys) identity (apply to-map dependencies))]
+      ))
+  (map #(vector % (path %)) features))
+
+

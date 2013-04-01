@@ -2,15 +2,11 @@
   (use clojure.test
        luminus.config))
 
-(deftest feature-precedence-test
-  (is (= 0 (feature-precedence :+site [:+site])))
-  (is (= -1 (feature-precedence :+clabango [:+clabango])))
-  (is (= -1 (feature-precedence :+hiccup [:+hiccup])))
-  (is (= -2 (feature-precedence :+auth-simple [:+auth-simple])))
-  (is (= -2 (feature-precedence :+dailycred [:+dailycred])))
-  (is (= -3 (feature-precedence :+dailycred-simple [:+dailycred-simple])))
-  (is (= -3 (feature-precedence :+oauth [:+oauth]))))
+(deftest expand-test
+  (is (= [:+site :+clabango :+auth-db] (expand [:+site])))
+  (is (= [:+site :+clabango :+dailycred] (expand [:+site :+dailycred])))
+  (is (= [:+site :+hiccup :+auth-db] (expand [:+site :+hiccup])))
+  (is (= [:+site :+other :+hiccup :+auth-db] (expand [:+site :+hiccup :+other])))
+  (is (= [:+site :+clabango :+auth-db :+other] (expand [:+site :+other]))))
 
 (run-tests)
-
-;(ns-unmap 'luminus.config-test 'feature-precedence-test)
