@@ -17,26 +17,17 @@
    (merge (apply to-map more)
           (to-map k v))))
 
-(to-map dependencies)
-
-(defn children-deps [feat deps]
-  (get deps feat))
-
-(defn default-dep [feat deps]
-    (first (keys (children-deps feat deps))))
-
-(default-dep :+site (to-map dependencies))
-
-(children-deps :+site (to-map dependencies))
-
-(defn expanded? [feat feats deps]
-  (let [children (children-deps feat deps)]
-    (or (empty? children)
-        (some (set (keys children)) feats))))
+(defn feature-dep [feat feats deps]
+  (let [children (get deps feat)]
+    (when (seq children)
+      (or (some (set (keys children)) feats)
+          (first (keys children))))))
   
-(expanded? :+site [:+clabango] (to-map dependencies))  
-(expanded? :+site [:+clabango] 
-           {:+hiccup {:+auth-db nil, :+dailycred nil}, :+clabango {:+auth-db nil, :+dailycred nil}, :+site {:+clabango {:+auth-db nil, :+dailycred nil}, :+hiccup {:+auth-db nil, :+dailycred nil}}})  
+(feature-dep :+site [:+hiccup] (to-map dependencies))  
+(feature-dep :+clabango [:+dailycred] 
+           {:+hiccup {:+auth-db nil, :+dailycred nil}, 
+            :+clabango {:+auth-db nil, :+dailycred nil}, 
+            :+site {:+clabango {:+auth-db nil, :+dailycred nil}, :+hiccup {:+auth-db nil, :+dailycred nil}}})  
 
   
 (defn spy [msg v]
@@ -69,28 +60,23 @@
 (some #{:a} [:a :b])
 
 (defn expand [features]
+  "a convenient feature of this function is that, after expanding, features will be sorted by order or execution"
   (loop [feats (seq features)
          deps (to-map dependencies)
          result []]
     ;(println (format "feats: %s \n deps: %s \n result: %s" feats deps result))
+    ;(Thread/sleep 3000)
     (if (empty? feats)
       result
       (let [feat (first feats)
-            new-feats (into (when-not (expanded? feat (into feats result) deps) 
-                              (vector (default-dep feat deps)))
-                            (rest feats))
-            new-deps (merge deps (select-keys (children-deps feat deps) (into feats result))) ; select default dep, or dep in features
-            new-result (conj result feat)]
+            feat-dep (feature-dep feat (concat feats result) deps)
+            new-feats (if feat-dep 
+                        (cons feat-dep (rest feats)) 
+                        (rest feats)) 
+            new-deps (merge deps (select-keys (children-deps feat deps) [feat-dep]))
+            new-result (-> #{feat} (remove result) vec (conj feat))] ;(if-not (some #{feat} result) (conj result feat) result)
         (recur new-feats
                new-deps
                new-result)))))
 
-(expand [:+site :+clabango])
-
-(defn augment [features]
-  (defn path [feat]
-    (let [dz (z/zipper map? (comp merge keys) identity (apply to-map dependencies))]
-      ))
-  (map #(vector % (path %)) features))
-
-
+(expand [:+hiccup :+site])
