@@ -11,12 +11,10 @@
   (is (= [:+site :+clabango :+auth-db :+other] (expand [:+site :+other]))))
 
 (deftest feature-dep-test
-  (def deps {:+clabango {:+auth-db nil, :+dailycred nil}, 
-             :+site {:+clabango {:+auth-db nil, :+dailycred nil}, :+hiccup {:+auth-db nil, :+dailycred nil}}})
-  (is (= :+clabango (feature-dep :+site [] deps)))
-  (is (= :+hiccup (feature-dep :+site [:+hiccup] deps)))
-  (is (= :+auth-db (feature-dep :+clabango [] deps)))
-  (is (= :+dailycred (feature-dep :+clabango [:+dailycred] deps))))
+  (is (= :+clabango (select-dep {:+clabango nil, :+hiccup nil} [])))
+  (is (= :+hiccup (select-dep {:+clabango nil, :+hiccup nil} [:+hiccup]))))
+
+(feature-dep nil [] {:+clabango nil, :+hiccup nil})
 
 (def deps1 (to-map dependencies))
 

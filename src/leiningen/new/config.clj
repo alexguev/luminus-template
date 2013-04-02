@@ -16,11 +16,10 @@
    (merge (apply to-map more)
           (to-map k v))))
 
-(defn feature-dep [feat feats deps]
-  (let [children (get deps feat)]
-    (when (seq children)
-      (or (some (set (keys children)) feats)
-          (first (keys children))))))
+(defn select-dep [deps feats]
+  (when (seq deps)
+    (or (some (set (keys deps)) feats)
+        (first (keys deps)))))
   
 (defn path [feature deps]
   (when (contains? deps feature)
@@ -38,17 +37,16 @@
   (loop [feats (seq features)
          deps (to-map dependencies)
          result []]
-    ;(println (format "feats: %s \n deps: %s \n result: %s" feats deps result))
-    ;(Thread/sleep 3000)
     (if (empty? feats)
       result
       (let [feat (first feats)
-            feat-dep (feature-dep feat (concat feats result) deps)
-            new-feats (if feat-dep 
-                        (cons feat-dep (rest feats)) 
+            feat-deps (get deps feat)
+            selected-dep (select-dep feat-deps (concat feats result))
+            new-feats (if selected-dep 
+                        (cons selected-dep (rest feats)) 
                         (rest feats)) 
-            new-deps (merge deps (select-keys (get deps feat) [feat-dep]))
-            new-result (-> #{feat} (remove result) vec (conj feat))] ;(if-not (some #{feat} result) (conj result feat) result)
+            new-deps (->> [selected-dep] (select-keys feat-deps) (merge deps))
+            new-result (-> #{feat} (remove result) vec (conj feat))]
         (recur new-feats
                new-deps
                new-result)))))
