@@ -1,5 +1,4 @@
-(ns luminus.config
-  (require [clojure.zip :as z]))
+(ns luminus.config)
 
 (def dependencies [:+site [:+clabango [:+auth-db 
                                        :+dailycred]
@@ -23,17 +22,6 @@
       (or (some (set (keys children)) feats)
           (first (keys children))))))
   
-(feature-dep :+site [:+hiccup] (to-map dependencies))  
-(feature-dep :+clabango [:+dailycred] 
-           {:+hiccup {:+auth-db nil, :+dailycred nil}, 
-            :+clabango {:+auth-db nil, :+dailycred nil}, 
-            :+site {:+clabango {:+auth-db nil, :+dailycred nil}, :+hiccup {:+auth-db nil, :+dailycred nil}}})  
-
-  
-(defn spy [msg v]
-  (println (format "%s: %s" msg v))
-  v)
-
 (defn path [feature deps]
   (when (contains? deps feature)
     (loop [path []
@@ -45,22 +33,8 @@
         (recur (into [parent] path) parent)
         path))))
 
-
-(def deps {:+dailycred nil, 
-           :+auth-db nil, 
-           :+hiccup {:+auth-db nil, :+dailycred nil}, 
-           :+clabango {:+auth-db nil, :+dailycred nil}, 
-           :+site {:+clabango {:+auth-db nil, :+dailycred nil}, :+hiccup {:+auth-db nil, :+dailycred nil}}})
-(path :+dailycred deps)
-
-(some (fn [[k v]] (and (map? v) (some #{:+hiccup} (keys v))) k) (seq deps))
-
-(and 1 2 nil)
-
-(some #{:a} [:a :b])
-
 (defn expand [features]
-  "a convenient feature of this function is that, after expanding, features will be sorted by order or execution"
+  "a convenient property of this function is that, after expanding, features will be sorted by order or execution"
   (loop [feats (seq features)
          deps (to-map dependencies)
          result []]
@@ -73,10 +47,17 @@
             new-feats (if feat-dep 
                         (cons feat-dep (rest feats)) 
                         (rest feats)) 
-            new-deps (merge deps (select-keys (children-deps feat deps) [feat-dep]))
+            new-deps (merge deps (select-keys (get deps feat) [feat-dep]))
             new-result (-> #{feat} (remove result) vec (conj feat))] ;(if-not (some #{feat} result) (conj result feat) result)
         (recur new-feats
                new-deps
                new-result)))))
 
-(expand [:+hiccup :+site])
+(defn augment-with-path [features]
+  (second (reduce (fn [[deps result] feat] 
+                    [(merge deps (select-keys (get deps feat) features)) 
+                     (conj result [feat (path feat deps)])]) 
+                  [(to-map dependencies) []] 
+                  features)))
+
+;(augment-with-path [:+site :+clabango :+dailycred])
